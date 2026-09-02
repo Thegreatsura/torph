@@ -109,6 +109,12 @@ Bump with `pnpm run version`, not `pnpm version` — pnpm intercepts `version` a
 
 ### Changesets
 
-Changesets are release notes, not a design document. The model is: a one-line summary, then bullets grouped under `#### Breaking`, `#### New`, `#### Improved`, `#### Fixed`, in that order, dropping any group that is empty.
+Changesets are release notes, not a design document — product notes, scanned rather than read. The model is: a one-line summary, then bullets grouped under `#### Breaking`, `#### New`, `#### Improved`, `#### Fixed`, in that order, dropping any group that is empty.
 
-A bullet is one sentence — two where a behaviour would otherwise look like a bug, or a breaking change needs a migration. It says what changed, not why or how it was built. No paragraphs, no prose sections, no code blocks. The reasoning belongs in code comments; a worked example belongs in [packages/test-cases/](packages/test-cases/).
+A bullet is one short line naming a feature, or an effect someone using the library would notice. Nothing about internals — no module names, no before-and-after mechanics, no account of the bug behind a fix.
+
+`#### Breaking` is for API breaks only: a removed or renamed export, a changed signature, a prop that no longer means what it did. It is the one group whose bullets earn a second sentence, for the migration. A change in how something looks or moves is not breaking, however visible.
+
+`#### New` names the feature and stops — `Multi-line text.`
+
+Four bullets beat ten. A bug nobody could have hit, an improvement nobody would notice, a refactor, an internal rename, test-only work — none of it earns a bullet. No paragraphs, no prose sections, no code blocks. The reasoning belongs in code comments; a worked example belongs in [packages/test-cases/](packages/test-cases/).
