@@ -5,7 +5,10 @@ import {
   verifyCharMorph,
   verifyCycleStability,
   verifyGraphemeMorph,
+  verifyKinds,
+  verifyKindsAfterMorph,
   verifyNoMorph,
+  verifyTextPlaces,
   verifyWordAbsent,
   verifyWordPersistence,
 } from "./verify";
@@ -215,14 +218,220 @@ export const CASES: TestCase[] = [
     },
   },
   {
-    label: "Numbers",
+    label: "Numbers morph by place",
     description:
-      "Shared digits and symbols ($, commas) persist. New digits enter.",
-    tags: ["char morph"],
+      "A numeric word goes to the number matcher, not to character matching. Four orders of magnitude is past the point where the two are the same figure moving, so only the affix holds and the number itself is replaced.",
+    tags: ["number", "place"],
     values: ["$1,234", "$12,345,678", "$99"],
     align: "right",
     verify: (t) =>
-      verifyGraphemeMorph(t, "$1,234", "$12,345,678", ["$", "1", ","]),
+      verifyTextPlaces(t, "$1,234", "$12,345,678", [
+        [0, 0],
+        [1, null],
+        [7, null],
+      ]),
+  },
+  {
+    label: "Number inside a sentence",
+    description:
+      "The figure morphs by place while the words around it hold their identity — the units digit stays put as the count grows a tens column.",
+    tags: ["number", "place"],
+    values: ["3 unread messages", "13 unread messages", "9 unread messages"],
+    verify: (t) =>
+      verifyTextPlaces(t, "3 unread messages", "13 unread messages", [
+        [0, null],
+        [1, 0],
+        [3, 2],
+        [5, 4],
+      ]),
+  },
+  {
+    label: "Digits and symbols are told apart",
+    description:
+      "Kinds drive the animation: digits slide down into place, the symbols around them slide up. Everything else stays text.",
+    tags: ["number"],
+    values: ["$1,234", "$5,678"],
+    verify: (t) =>
+      verifyKinds(t, "$1,234", [
+        "symbol",
+        "digit",
+        "symbol",
+        "digit",
+        "digit",
+        "digit",
+      ]),
+  },
+  {
+    label: "Version strings stay text",
+    description:
+      'A token has to be a quantity all the way through to morph as one. "v1.2.3" has no units column, so it morphs character by character like any other word.',
+    tags: ["number"],
+    values: ["v1.2.3", "v1.3.0", "v2.0.0"],
+    verify: (t) => verifyKinds(t, "v1.2.3", new Array(6).fill(undefined)),
+  },
+  {
+    label: "Two numbers, one sentence",
+    description:
+      "The second figure pairs with the second figure, not with the first. Both numbers stand in for each other during the word-level match, so their order in the sentence is what carries them across.",
+    tags: ["number", "place"],
+    values: ["2 of 10 done", "2 of 15 done", "7 of 15 done"],
+    verify: (t) =>
+      verifyTextPlaces(t, "2 of 10 done", "2 of 15 done", [
+        [0, 0],
+        [4, 4],
+        [5, null],
+        [7, 7],
+      ]),
+  },
+  {
+    label: "Emptying a number to its affix",
+    description:
+      'Backspacing the last digit out of "$4" leaves a token with no digits left to be a number by. The dollar sign is still the same dollar sign, so it holds rather than re-entering.',
+    tags: ["number", "exit"],
+    values: ["$4", "$", "$4", "$420"],
+    verify: (t) =>
+      combineResults(
+        verifyTextPlaces(t, "$4", "$", [[0, 0]]),
+        verifyTextPlaces(t, "$", "$420", [[0, 0]]),
+      ),
+  },
+  {
+    label: "A number never claims a word",
+    description:
+      '"5" and "five" are the same quantity and share no characters, so the digit leaves and the word arrives. Spelling is the only thing the diff can see.',
+    tags: ["number"],
+    values: ["5 items", "five items"],
+    verify: (t) =>
+      combineResults(
+        verifyTextPlaces(t, "5 items", "five items", [
+          [0, null],
+          [2, 2],
+        ]),
+        verifyWordPersistence(t, "5 items", "five items", "items"),
+      ),
+  },
+  {
+    label: "Affixes hold while digits churn",
+    description:
+      "Brackets, currency symbols and group separators are the still part of a number. Every digit can change under them without any of them moving.",
+    tags: ["number", "place"],
+    values: ["(1,234)", "(5,678)", "12%", "97%"],
+    align: "right",
+    verify: (t) =>
+      verifyTextPlaces(t, "(1,234)", "(5,678)", [
+        [0, 0],
+        [2, 2],
+        [6, 6],
+      ]),
+  },
+  {
+    label: "A digit pushed into the middle",
+    description:
+      "1,234 gains a column and 123,456 gains a digit in the middle of itself. Both keep every digit they already had: when a number changes shape rather than just value, what carries is which digits are the same digits, so the run slides to its new magnitude instead of the whole figure being rebuilt around the newcomer.",
+    tags: ["number", "place", "enter"],
+    values: ["123,456", "1,234,576"],
+    verify: (t) =>
+      verifyTextPlaces(t, "123,456", "1,234,576", [
+        [0, 0],
+        [2, 1],
+        [3, 2],
+        [4, 4],
+        [6, 5],
+        [8, 6],
+        [7, null],
+      ]),
+  },
+  {
+    label: "A number holds across a new line",
+    description:
+      "A second line arrives above a figure that has not itself changed. Each numeric character sits in its own clip box rather than relying on the root, so gaining a line costs the number nothing — every digit keeps its identity and its place.",
+    tags: ["number", "multiline"],
+    values: ["1,234", "Total\n1,234"],
+    minLines: 2,
+    verify: (t) =>
+      combineResults(
+        verifyTextPlaces(t, "1,234", "Total\n1,234", [
+          [2, 0],
+          [3, 1],
+          [4, 2],
+          [5, 3],
+          [6, 4],
+        ]),
+        verifyKindsAfterMorph(t, "1,234", "Total\n1,234", [
+          undefined,
+          undefined,
+          "digit",
+          "symbol",
+          "digit",
+          "digit",
+          "digit",
+        ]),
+      ),
+  },
+  {
+    label: "A number changes as a line arrives",
+    description:
+      "The second line and a new figure land on the same morph. Place matching still applies across the line change, and every digit here is different — so the group separator is the one thing that carries.",
+    tags: ["number", "multiline", "place"],
+    values: ["1,234", "Total\n5,678"],
+    minLines: 2,
+    verify: (t) =>
+      verifyTextPlaces(t, "1,234", "Total\n5,678", [
+        [2, null],
+        [3, 1],
+      ]),
+  },
+  {
+    label: "A number on a middle line updates",
+    description:
+      "The figure between two other lines is replaced while they hold still, newlines included. A digit slides one line box, not the height of the whole block, and its slot is what it disappears behind — so the lines around it are never touched.",
+    tags: ["number", "multiline", "place"],
+    values: ["a\n1,234\nb", "a\n5,678\nb"],
+    minLines: 3,
+    verify: (t) =>
+      combineResults(
+        verifyTextPlaces(t, "a\n1,234\nb", "a\n5,678\nb", [
+          [0, 0],
+          [1, 1],
+          [3, 3],
+          [7, 7],
+          [8, 8],
+        ]),
+        verifyKindsAfterMorph(t, "a\n1,234\nb", "a\n5,678\nb", [
+          undefined,
+          undefined,
+          "digit",
+          "symbol",
+          "digit",
+          "digit",
+          "digit",
+          undefined,
+          undefined,
+        ]),
+      ),
+  },
+  {
+    label: "A number swaps lines with its label",
+    description:
+      "The figure moves from the bottom line to the top and the label goes the other way. Both are matched as whole words across the newline, so they trade places intact rather than being rebuilt.",
+    tags: ["number", "multiline"],
+    values: ["text\n1,234", "1,234\ntext"],
+    minLines: 2,
+    verify: (t) =>
+      verifyTextPlaces(t, "text\n1,234", "1,234\ntext", [
+        [0, 2],
+        [1, 3],
+        [4, 6],
+        [6, 0],
+      ]),
+  },
+  {
+    label: "Dates stay text",
+    description:
+      "Same rule, and the one that matters most for a default: a hyphen is not a group separator, so a date is never mistaken for a number.",
+    tags: ["number"],
+    values: ["2024-01-01", "2024-02-01"],
+    verify: (t) => verifyKinds(t, "2024-01-01", new Array(10).fill(undefined)),
   },
   {
     label: "Long word char morph",

@@ -1,5 +1,25 @@
-import type { Segment } from "./segment";
-import { ATTR_EXITING, ATTR_ID, ATTR_ITEM } from "./constants";
+import type { Segment } from "./types";
+import {
+  ATTR_EXITING,
+  ATTR_ID,
+  ATTR_ITEM,
+  ATTR_KIND,
+  ATTR_SLOT,
+} from "./constants";
+
+/**
+ * Every element the engine puts in the root is a fragment of the value rather
+ * than the value: a word split to the character, a character mid-exit, a `br`
+ * standing in for a newline. None of it reads as the text it draws, so all of
+ * it is hidden and the root's `[torph-sr]` node speaks for the whole.
+ */
+function createItem(tagName: "span" | "br", id: string): HTMLElement {
+  const element = document.createElement(tagName);
+  element.setAttribute(ATTR_ITEM, "");
+  element.setAttribute(ATTR_ID, id);
+  element.setAttribute("aria-hidden", "true");
+  return element;
+}
 
 export function detachFromFlow(
   container: HTMLElement,
@@ -70,14 +90,55 @@ export function splitWordSpans(
     split.add(id);
 
     for (const seg of charSegs) {
-      const span = document.createElement("span");
-      span.setAttribute(ATTR_ITEM, "");
-      span.setAttribute(ATTR_ID, seg.id);
-      span.textContent = seg.string;
+      const span = createItem("span", seg.id);
+      syncSlot(span, seg);
       child.before(span);
     }
     child.remove();
   }
+}
+
+/**
+ * Gives a numeric character the nested box its slide needs, and takes it away
+ * again when the same character stops being one.
+ *
+ * The kind is written to the element because an exit outlives the segment that
+ * described it — by the time it animates, the element is all that is left.
+ *
+ * Both directions have to work on an element being reused: a figure that gains
+ * a second line becomes text and has to shed its slot, and gets it back when
+ * the value returns to one line.
+ */
+function syncSlot(element: HTMLElement, segment: Segment) {
+  if (!segment.kind) {
+    element.removeAttribute(ATTR_KIND);
+    element.removeAttribute(ATTR_SLOT);
+    // Also discards the inner span, if this element had one.
+    element.textContent = segment.string;
+    return;
+  }
+
+  element.setAttribute(ATTR_KIND, segment.kind);
+  element.setAttribute(ATTR_SLOT, "");
+
+  let inner = element.firstElementChild as HTMLElement | null;
+  if (!inner) {
+    element.textContent = "";
+    inner = document.createElement("span");
+    element.appendChild(inner);
+  }
+  inner.textContent = segment.string;
+}
+
+/**
+ * The box the slide is applied to. For a slot that is the nested span, so the
+ * movement is clipped by the slot around it; for anything else the element is
+ * its own mover.
+ */
+export function moverOf(element: HTMLElement): HTMLElement {
+  return element.hasAttribute(ATTR_SLOT)
+    ? ((element.firstElementChild as HTMLElement | null) ?? element)
+    : element;
 }
 
 export function reconcileChildren(
@@ -112,22 +173,21 @@ export function reconcileChildren(
       if (existing && existing.tagName === "BR") {
         element.appendChild(existing);
       } else {
-        const br = document.createElement("br");
-        br.setAttribute(ATTR_ITEM, "");
-        br.setAttribute(ATTR_ID, segment.id);
-        element.appendChild(br);
+        element.appendChild(createItem("br", segment.id));
       }
       return;
     }
 
     if (existing && existing.tagName !== "BR") {
-      existing.textContent = segment.string;
+      // A group replacement leaves a shared origin behind on its members. Left
+      // there, the next morph would scale this element about a point somewhere
+      // else entirely.
+      existing.style.transformOrigin = "";
+      syncSlot(existing, segment);
       element.appendChild(existing);
     } else {
-      const span = document.createElement("span");
-      span.setAttribute(ATTR_ITEM, "");
-      span.setAttribute(ATTR_ID, segment.id);
-      span.textContent = segment.string;
+      const span = createItem("span", segment.id);
+      syncSlot(span, segment);
       element.appendChild(span);
     }
   });
