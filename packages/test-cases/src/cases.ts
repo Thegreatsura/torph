@@ -91,6 +91,18 @@ export const CASES: TestCase[] = [
       ),
   },
   {
+    label: "Resemblance across a surviving word",
+    description:
+      '"Copy" and "Copied" share "Cop", but "Address" survives between them. "Copy" exits and "Copied" enters — the shared characters do not cross the value.',
+    tags: ["no morph", "enter", "exit"],
+    values: ["Copy Address", "Address Copied"],
+    verify: (t) =>
+      combineResults(
+        verifyNoMorph(t, "Copy Address", "Address Copied"),
+        verifyWordPersistence(t, "Copy Address", "Address Copied", "Address"),
+      ),
+  },
+  {
     label: "Multi-word persist",
     description:
       '"the" and "brown" persist across states. Changed words enter/exit smoothly.',

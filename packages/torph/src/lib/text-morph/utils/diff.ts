@@ -86,6 +86,22 @@ function charSimilarity(a: string, b: string): number {
   return matched.length / Math.max(a.length, b.length);
 }
 
+/**
+ * How many LCS matches sit before each word — the index of the gap it occupies.
+ *
+ * The matches are order-preserving and paired k-for-k, so an old word and a new
+ * word holding the same gap index lie between the same two surviving words.
+ */
+function gapIndices(count: number, matched: Set<number>): number[] {
+  const gaps: number[] = [];
+  let anchors = 0;
+  for (let i = 0; i < count; i++) {
+    gaps.push(anchors);
+    if (matched.has(i)) anchors++;
+  }
+  return gaps;
+}
+
 const MIN_SIMILARITY = 0.4;
 
 /**
@@ -209,6 +225,12 @@ export function diffSegments(
   const morphPairs = new Map<number, number>();
   const usedOld = new Set<number>();
 
+  // Which words are still standing, and so which words a pairing would have to
+  // travel past. Read from the LCS alone: the exact-match pass above is allowed
+  // to reorder, and its pairs are not anchors anything holds still against.
+  const oldGaps = gapIndices(oldWordStrings.length, oldMatchedSet);
+  const newGaps = gapIndices(newWordStrings.length, newMatchedSet);
+
   if (oldUnmatched.length * newUnmatched.length <= MAX_MORPH_PAIRINGS) {
     for (const ni of newUnmatched) {
       let bestOi = -1;
@@ -216,6 +238,13 @@ export function diffSegments(
 
       for (const oi of oldUnmatched) {
         if (usedOld.has(oi)) continue;
+        // A resemblance is only worth animating where the two words stand in
+        // the same place. "Copy Address" → "Address Copied" shares "Cop", but
+        // "Copy" comes before the surviving "Address" and "Copied" after it, so
+        // honouring that pairing drags three characters the width of the value,
+        // across a word that is holding still. Retiring "Copy" and entering
+        // "Copied" is what the change actually looks like.
+        if (oldGaps[oi] !== newGaps[ni]) continue;
         // Numeric and non-numeric words pair freely here. Whether a token is a
         // quantity is not the same question as whether it is *this* token's
         // predecessor: deleting the last digit of "$4" leaves "$", which has no
