@@ -18,7 +18,7 @@ export const Examples = () => {
         {DEMOS.map(({ label, Component }, index) => (
           <div key={index} className={styles.example}>
             <LazyDemo Component={Component} />
-            <span className={styles.label}>{label}</span>
+            {label && <span className={styles.label}>{label}</span>}
           </div>
         ))}
       </section>
