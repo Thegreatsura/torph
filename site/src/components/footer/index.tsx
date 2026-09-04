@@ -15,7 +15,7 @@ export const Footer = () => {
         >
           <img
             src="https://lochie.me/avatar.jpg"
-            alt="Avatar of Lochie"
+            alt=""
             width={20}
             height={20}
           />
@@ -34,6 +34,8 @@ export const Footer = () => {
         </a>
         {" • "}
         <Link href="/examples">Examples</Link>
+        {" • "}
+        <Link href="/showcase">Showcase</Link>
         {" • "}
         <Link href="/playground">Playground</Link>
       </div>
