@@ -1,5 +1,28 @@
 # torph
 
+## 0.1.2
+
+### Patch Changes
+
+- 743ca6b: Keep caret matching honest in a field that groups its digits.
+
+  #### Fixed
+
+  - Typing in a number field that inserts thousand separators no longer scrambles the digits — a comma appearing beside the caret used to make neighbouring digits morph into each other.
+
+- 743ca6b: Keep the box with a value that changes faster than the morph settles.
+
+  #### Fixed
+
+  - Text updated rapidly no longer sits in a box sized to an earlier value until the updates slow down.
+  - A prop passed as `undefined` now falls back to its default instead of throwing.
+
+- 743ca6b: Correct sizing for a value inside a rotated or scaled element.
+
+  #### Fixed
+
+  - A value inside a rotated or scaled element no longer grows with every morph.
+
 ## 0.1.1
 
 ### Patch Changes
@@ -7,23 +30,27 @@
 - cde5096: Numbers morph by place value, and a morph is readable to screen readers.
 
   #### New
+
   - Number morphing, matched digit by digit. On by default — `numbers={false}` to opt out.
   - `update()` and the components accept a `number`, with `locale` and `decimals` options.
   - `cursorIndex`, for editable fields.
   - `segmentNumber`, `isNumericWord` and `decimalSeparator` exports.
 
   #### Improved
+
   - Digits keep their column, so `99 → 199` grows a digit on the left.
   - Currency symbols, percent signs and units stay put.
   - `COVID-19` and dates still morph as text.
 
   #### Fixed
+
   - Screen readers read the value, not its mid-morph fragments. Add `aria-live` to announce changes.
   - React's `onAnimationStart` and `onAnimationComplete` no longer go stale.
 
 - 7b4e5e0: A word no longer character-morphs across a word that is staying put.
 
   #### Fixed
+
   - `Copy Address` → `Address Copied` no longer drags `Cop` past the `Address` between them.
 
 ## 0.1.0
@@ -33,12 +60,14 @@
 - c86b1e0: Word- and character-level diffing, multi-line text, and a rewritten container animation
 
   #### New
+
   - Multi-line text.
   - Words that survive a change travel to their new position instead of crossfading.
   - `onAnimationCancel`, so a superseded morph can still be awaited.
   - `segmentText` and `diffSegments` exports.
 
   #### Fixed
+
   - Markup in a value could execute scripts in React.
   - The container no longer gets stuck at the wrong size.
 
