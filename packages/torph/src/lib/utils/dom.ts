@@ -1,4 +1,5 @@
 import type { Segment } from "./types";
+import { layoutSize, parseTranslate } from "./animate";
 import {
   ATTR_EXITING,
   ATTR_ID,
@@ -6,6 +7,27 @@ import {
   ATTR_KIND,
   ATTR_SLOT,
 } from "./constants";
+
+/**
+ * Where a `left`/`top` write puts the box. Not `getBoundingClientRect`, which is the
+ * visual box: a rotated or scaled ancestor inflates it, and the inflated numbers are
+ * then read back as layout and transformed a second time. The walk stops at the
+ * container when it is positioned, and otherwise carries on to the ancestor an
+ * absolute child would resolve against — the same one either way.
+ */
+function layoutOffset(child: HTMLElement, container: HTMLElement) {
+  let x = 0;
+  let y = 0;
+  for (
+    let node: HTMLElement | null = child;
+    node && node !== container;
+    node = node.offsetParent as HTMLElement | null
+  ) {
+    x += node.offsetLeft;
+    y += node.offsetTop;
+  }
+  return { x, y };
+}
 
 /** Every element here is a fragment of the value, so all of it is aria-hidden. */
 function createItem(tagName: "span" | "br", id: string): HTMLElement {
@@ -20,7 +42,6 @@ export function detachFromFlow(
   container: HTMLElement,
   elements: HTMLElement[],
 ) {
-  const containerRect = container.getBoundingClientRect();
   const snapshots = new Map<
     HTMLElement,
     {
@@ -33,14 +54,18 @@ export function detachFromFlow(
   >();
   for (const child of elements) {
     if (child.tagName === "BR") continue;
-    const rect = child.getBoundingClientRect();
+    const { x, y } = layoutOffset(child, container);
+    // Where the box had got to, so an interrupt does not jump. Scale is dropped with
+    // the animation, as it is everywhere else a running transform is picked up.
+    const { tx, ty } = parseTranslate(child);
+    const { width, height } = layoutSize(child);
     const opacity = Number(getComputedStyle(child).opacity) || 1;
     child.getAnimations().forEach((a) => a.cancel());
     snapshots.set(child, {
-      left: rect.left - containerRect.left,
-      top: rect.top - containerRect.top,
-      width: rect.width,
-      height: rect.height,
+      left: x + tx,
+      top: y + ty,
+      width,
+      height,
       opacity,
     });
   }
